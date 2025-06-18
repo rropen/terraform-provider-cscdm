@@ -250,18 +250,22 @@ type ZoneSoaRecordJson struct {
 	MasterHost string `json:"masterHost"`
 }
 
+func convertZoneRecord(rec ZoneRecordJson) ZoneRecordModel {
+	return ZoneRecordModel{
+		Id:       types.StringValue(rec.Id),
+		Key:      types.StringValue(rec.Key),
+		Value:    types.StringValue(rec.Value),
+		Ttl:      types.Int64Value(rec.Ttl),
+		Status:   types.StringValue(rec.Status),
+		Priority: types.Int64Value(rec.Priority),
+	}
+}
+
 func convertZoneRecords(recs []ZoneRecordJson) []ZoneRecordModel {
 	records := make([]ZoneRecordModel, len(recs))
 
 	for i, rec := range recs {
-		records[i] = ZoneRecordModel{
-			Id:       types.StringValue(rec.Id),
-			Key:      types.StringValue(rec.Key),
-			Value:    types.StringValue(rec.Value),
-			Ttl:      types.Int64Value(rec.Ttl),
-			Status:   types.StringValue(rec.Status),
-			Priority: types.Int64Value(rec.Priority),
-		}
+		records[i] = convertZoneRecord(rec)
 	}
 
 	return records
@@ -272,15 +276,8 @@ func convertZoneSrvRecords(recs []ZoneSrvRecordJson) []ZoneSrvRecordModel {
 
 	for i, rec := range recs {
 		records[i] = ZoneSrvRecordModel{
-			ZoneRecordModel: ZoneRecordModel{
-				Id:       types.StringValue(rec.Id),
-				Key:      types.StringValue(rec.Key),
-				Value:    types.StringValue(rec.Value),
-				Ttl:      types.Int64Value(rec.Ttl),
-				Status:   types.StringValue(rec.Status),
-				Priority: types.Int64Value(rec.Priority),
-			},
-			Port: types.Int32Value(rec.Port),
+			ZoneRecordModel: convertZoneRecord(rec.ZoneRecordJson),
+			Port:            types.Int32Value(rec.Port),
 		}
 	}
 
