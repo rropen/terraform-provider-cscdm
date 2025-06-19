@@ -206,22 +206,24 @@ type ZonesJson struct {
 		NumResults int64 `json:"numResults"`
 		Pages      int64 `json:"pages"`
 	} `json:"meta"`
-	Zones []struct {
-		ZoneName    string              `json:"zoneName"`
-		HostingType string              `json:"hostingType"`
-		A           []ZoneRecordJson    `json:"a"`
-		CNAME       []ZoneRecordJson    `json:"cname"`
-		AAAA        []ZoneRecordJson    `json:"aaaa"`
-		TXT         []ZoneRecordJson    `json:"txt"`
-		MX          []ZoneRecordJson    `json:"mx"`
-		NS          []ZoneRecordJson    `json:"ns"`
-		SRV         []ZoneSrvRecordJson `json:"srv"`
-		CAA         []ZoneRecordJson    `json:"caa"`
-		SOA         ZoneSoaRecordJson   `json:"soa"`
-	} `json:"zones"`
+	Zones []ZoneJson `json:"zones"`
 	Links struct {
 		Self string `json:"self"`
 	} `json:"links"`
+}
+
+type ZoneJson struct {
+	ZoneName    string              `json:"zoneName"`
+	HostingType string              `json:"hostingType"`
+	A           []ZoneRecordJson    `json:"a"`
+	CNAME       []ZoneRecordJson    `json:"cname"`
+	AAAA        []ZoneRecordJson    `json:"aaaa"`
+	TXT         []ZoneRecordJson    `json:"txt"`
+	MX          []ZoneRecordJson    `json:"mx"`
+	NS          []ZoneRecordJson    `json:"ns"`
+	SRV         []ZoneSrvRecordJson `json:"srv"`
+	CAA         []ZoneRecordJson    `json:"caa"`
+	SOA         ZoneSoaRecordJson   `json:"soa"`
 }
 
 type ZoneRecordJson struct {
@@ -248,6 +250,22 @@ type ZoneSoaRecordJson struct {
 	TtlZone    int64  `json:"ttlZone"`
 	TechEmail  string `json:"techEmail"`
 	MasterHost string `json:"masterHost"`
+}
+
+func convertZone(zone ZoneJson) ZoneModel {
+	return ZoneModel{
+		ZoneName:    types.StringValue(zone.ZoneName),
+		HostingType: types.StringValue(zone.HostingType),
+		A:           convertZoneRecords(zone.A),
+		AAAA:        convertZoneRecords(zone.AAAA),
+		CNAME:       convertZoneRecords(zone.CNAME),
+		MX:          convertZoneRecords(zone.MX),
+		NS:          convertZoneRecords(zone.NS),
+		TXT:         convertZoneRecords(zone.TXT),
+		SRV:         convertZoneSrvRecords(zone.SRV),
+		CAA:         convertZoneRecords(zone.CAA),
+		SOA:         convertZoneSoaRecord(zone.SOA),
+	}
 }
 
 func convertZoneRecord(rec ZoneRecordJson) ZoneRecordModel {
@@ -315,21 +333,9 @@ func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	}
 
 	for _, zone := range zonesJson.Zones {
-		zoneState := ZoneModel{
-			ZoneName:    types.StringValue(zone.ZoneName),
-			HostingType: types.StringValue(zone.HostingType),
-			A:           convertZoneRecords(zone.A),
-			AAAA:        convertZoneRecords(zone.AAAA),
-			CNAME:       convertZoneRecords(zone.CNAME),
-			MX:          convertZoneRecords(zone.MX),
-			NS:          convertZoneRecords(zone.NS),
-			TXT:         convertZoneRecords(zone.TXT),
-			SRV:         convertZoneSrvRecords(zone.SRV),
-			CAA:         convertZoneRecords(zone.CAA),
-			SOA:         convertZoneSoaRecord(zone.SOA),
-		}
-		state.Zones = append(state.Zones, zoneState)
+		state.Zones = append(state.Zones, convertZone(zone))
 	}
+
 	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
