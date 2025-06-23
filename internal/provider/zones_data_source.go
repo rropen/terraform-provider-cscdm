@@ -90,14 +90,12 @@ func (d *ZonesDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 		},
 		"ttl": schema.Int64Attribute{
 			Computed: true,
-			Optional: true,
 		},
 		"status": schema.StringAttribute{
 			Computed: true,
 		},
 		"priority": schema.Int64Attribute{
 			Computed: true,
-			Optional: true,
 		},
 	}
 	RecordList := schema.ListNestedAttribute{
@@ -113,7 +111,6 @@ func (d *ZonesDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 	}
 	SrvRecordListAttrs["port"] = schema.Int32Attribute{
 		Computed: true,
-		Optional: true,
 	}
 	SrvRecordList := schema.ListNestedAttribute{
 		Computed: true,
