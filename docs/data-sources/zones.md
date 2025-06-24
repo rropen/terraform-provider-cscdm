@@ -39,96 +39,78 @@ Read-Only:
 <a id="nestedatt--zones--a"></a>
 ### Nested Schema for `zones.a`
 
-Optional:
-
-- `priority` (Number)
-- `ttl` (Number)
-
 Read-Only:
 
 - `id` (String)
 - `key` (String)
+- `priority` (Number)
 - `status` (String)
+- `ttl` (Number)
 - `value` (String)
 
 
 <a id="nestedatt--zones--aaaa"></a>
 ### Nested Schema for `zones.aaaa`
 
-Optional:
-
-- `priority` (Number)
-- `ttl` (Number)
-
 Read-Only:
 
 - `id` (String)
 - `key` (String)
+- `priority` (Number)
 - `status` (String)
+- `ttl` (Number)
 - `value` (String)
 
 
 <a id="nestedatt--zones--caa"></a>
 ### Nested Schema for `zones.caa`
 
-Optional:
-
-- `priority` (Number)
-- `ttl` (Number)
-
 Read-Only:
 
 - `id` (String)
 - `key` (String)
+- `priority` (Number)
 - `status` (String)
+- `ttl` (Number)
 - `value` (String)
 
 
 <a id="nestedatt--zones--cname"></a>
 ### Nested Schema for `zones.cname`
 
-Optional:
-
-- `priority` (Number)
-- `ttl` (Number)
-
 Read-Only:
 
 - `id` (String)
 - `key` (String)
+- `priority` (Number)
 - `status` (String)
+- `ttl` (Number)
 - `value` (String)
 
 
 <a id="nestedatt--zones--mx"></a>
 ### Nested Schema for `zones.mx`
 
-Optional:
-
-- `priority` (Number)
-- `ttl` (Number)
-
 Read-Only:
 
 - `id` (String)
 - `key` (String)
+- `priority` (Number)
 - `status` (String)
+- `ttl` (Number)
 - `value` (String)
 
 
 <a id="nestedatt--zones--ns"></a>
 ### Nested Schema for `zones.ns`
 
-Optional:
-
-- `priority` (Number)
-- `ttl` (Number)
-
 Read-Only:
 
 - `id` (String)
 - `key` (String)
+- `priority` (Number)
 - `status` (String)
+- `ttl` (Number)
 - `value` (String)
 
 
@@ -151,31 +133,25 @@ Read-Only:
 <a id="nestedatt--zones--srv"></a>
 ### Nested Schema for `zones.srv`
 
-Optional:
-
-- `port` (Number)
-- `priority` (Number)
-- `ttl` (Number)
-
 Read-Only:
 
 - `id` (String)
 - `key` (String)
+- `port` (Number)
+- `priority` (Number)
 - `status` (String)
+- `ttl` (Number)
 - `value` (String)
 
 
 <a id="nestedatt--zones--txt"></a>
 ### Nested Schema for `zones.txt`
 
-Optional:
-
-- `priority` (Number)
-- `ttl` (Number)
-
 Read-Only:
 
 - `id` (String)
 - `key` (String)
+- `priority` (Number)
 - `status` (String)
+- `ttl` (Number)
 - `value` (String)
