@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -29,6 +28,7 @@ type ZonesDataSource struct {
 
 type ZonesDataSourceModel struct {
 	Zones []ZoneModel `tfsdk:"zones"`
+	Name types.String `tfsdk:"name"`
 }
 
 type ZoneModel struct {
@@ -94,11 +94,6 @@ func (d *ZonesDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 		},
 		"priority": schema.Int64Attribute{
 			Computed: true,
-		},
-		"name": schema.StringAttribute{
-			Computed: true,
-			Optional: true,
-			Description: "Optional name of desired zone",
 		},
 	}
 	RecordList := schema.ListNestedAttribute{
@@ -177,6 +172,9 @@ func (d *ZonesDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 					},
 				},
 			},
+			"name": schema.StringAttribute{
+				Optional: true,
+			},	
 		},
 	}
 }
@@ -318,42 +316,37 @@ func convertZoneSoaRecord(rec ZoneSoaRecordJson) ZoneSoaRecordModel {
 
 func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var state ZonesDataSourceModel
-	var zoneName string
-
-
-	diags, err := req.Config.GetAttribute(ctx, []string{"name"}, &zoneName)
-	if err != nil {
-		resp.Diagnostics.AddError("Name Error", fmt.Sprintf("Unable to read name, got error: %s", err))
-		return
-	}
-
-	zonesResp, err := d.client.Get("zones")
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read zones, got error: %s", err))
-		return
-	}
-
 	var zonesJson ZonesJson
-	err = json.NewDecoder(zonesResp.Body).Decode(&zonesJson)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal zones, got error: %s", err))
-		return
-	}
 
-	if zoneName != "" {
-		for _, zone := range zonesJson.Zones {
-			state.Zones = append(state.Zones, convertZone(zone))
+	resp.State.Get(ctx, &state)
+	
+	if state.Name != types.StringNull() {
+		fmt.Println("zones/" + state.Name.String() + "           --------test")
+		zonesResp, err := d.client.Get("zones")
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read desired zone, got error: %s", err))
+			return
+		}
+		err = json.NewDecoder(zonesResp.Body).Decode(&zonesJson)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal desired zone, got error: %s", err))
+			return
+		}
+	} else {
+		zonesResp, err := d.client.Get("zones")
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read zones, got error: %s", err))
+			return
+		}
+		err = json.NewDecoder(zonesResp.Body).Decode(&zonesJson)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal zones, got error: %s", err))
+			return
 		}
 	}
-	else {
-		index := slices.IndexFunc(zonesJson.Zones, func(desired ZoneJson) {
-			return desired.ZoneName == zoneName
-		})
-		if (index != -1) {
-			state.Zones = append(state.Zones, convertZone(zonesJson.Zones[index]))
-		}
+	for _, zone := range zonesJson.Zones {
+		state.Zones = append(state.Zones, convertZone(zone))
 	}
-
 
 	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
