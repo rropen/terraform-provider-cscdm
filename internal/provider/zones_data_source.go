@@ -98,7 +98,7 @@ func (d *ZonesDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 		"name": schema.StringAttribute{
 			Computed: true,
 			Optional: true,
-			Description: "Optional name of desired zone"
+			Description: "Optional name of desired zone",
 		},
 	}
 	RecordList := schema.ListNestedAttribute{
