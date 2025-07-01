@@ -27,8 +27,8 @@ type ZonesDataSource struct {
 }
 
 type ZonesDataSourceModel struct {
-	Zones []ZoneModel `tfsdk:"zones"`
-	Name types.String `tfsdk:"name"`
+	Zones	[]ZoneModel		`tfsdk:"zones"`
+	Name	types.String	`tfsdk:"name"`
 }
 
 type ZoneModel struct {
