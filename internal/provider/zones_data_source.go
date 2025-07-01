@@ -318,8 +318,10 @@ func convertZoneSoaRecord(rec ZoneSoaRecordJson) ZoneSoaRecordModel {
 
 func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var state ZonesDataSourceModel
+	var zoneName string
 
-	zoneName, err := req.Config.GetAttribute(ctx, []string{"name"}, &optionalFieldValue)
+
+	diags, err := req.Config.GetAttribute(ctx, []string{"name"}, &zoneName)
 	if err != nil {
 		resp.Diagnostics.AddError("Name Error", fmt.Sprintf("Unable to read name, got error: %s", err))
 		return
