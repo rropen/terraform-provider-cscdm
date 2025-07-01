@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -93,6 +94,11 @@ func (d *ZonesDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 		},
 		"priority": schema.Int64Attribute{
 			Computed: true,
+		},
+		"name": schema.StringAttribute{
+			Computed: true,
+			Optional: true,
+			Description: "Optional name of desired zone"
 		},
 	}
 	RecordList := schema.ListNestedAttribute{
@@ -313,6 +319,12 @@ func convertZoneSoaRecord(rec ZoneSoaRecordJson) ZoneSoaRecordModel {
 func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var state ZonesDataSourceModel
 
+	zoneName, err := req.Config.GetAttribute(ctx, []string{"name"}, &optionalFieldValue)
+	if err != nil {
+		resp.Diagnostics.AddError("Name Error", fmt.Sprintf("Unable to read name, got error: %s", err))
+		return
+	}
+
 	zonesResp, err := d.client.Get("zones")
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read zones, got error: %s", err))
@@ -326,9 +338,20 @@ func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	for _, zone := range zonesJson.Zones {
-		state.Zones = append(state.Zones, convertZone(zone))
+	if zoneName != "" {
+		for _, zone := range zonesJson.Zones {
+			state.Zones = append(state.Zones, convertZone(zone))
+		}
 	}
+	else {
+		index := slices.IndexFunc(zonesJson.Zones, func(desired ZoneJson) {
+			return desired.ZoneName == zoneName
+		})
+		if (index != -1) {
+			state.Zones = append(state.Zones, convertZone(zonesJson.Zones[index]))
+		}
+	}
+
 
 	diags := resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
