@@ -316,23 +316,25 @@ func convertZoneSoaRecord(rec ZoneSoaRecordJson) ZoneSoaRecordModel {
 
 func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var state ZonesDataSourceModel
-	var zonesJson ZonesJson
+	
 
 	resp.State.Get(ctx, &state)
 	
 	if state.Name != types.StringNull() {
-		fmt.Println("zones/" + state.Name.String() + "           --------test")
-		zonesResp, err := d.client.Get("zones")
+		var zoneJson ZoneJson
+		zonesResp, err := d.client.Get("zones/" + state.Name.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read desired zone, got error: %s", err))
 			return
 		}
-		err = json.NewDecoder(zonesResp.Body).Decode(&zonesJson)
+		err = json.NewDecoder(zonesResp.Body).Decode(&zoneJson)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal desired zone, got error: %s", err))
 			return
 		}
+		state.Zones = append(state.Zones, convertZone(zoneJson))
 	} else {
+		var zonesJson ZonesJson
 		zonesResp, err := d.client.Get("zones")
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read zones, got error: %s", err))
@@ -343,9 +345,9 @@ func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal zones, got error: %s", err))
 			return
 		}
-	}
-	for _, zone := range zonesJson.Zones {
-		state.Zones = append(state.Zones, convertZone(zone))
+		for _, zone := range zonesJson.Zones {
+			state.Zones = append(state.Zones, convertZone(zone))
+		}
 	}
 
 	diags := resp.State.Set(ctx, &state)
