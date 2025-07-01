@@ -27,8 +27,8 @@ type ZonesDataSource struct {
 }
 
 type ZonesDataSourceModel struct {
-	Zones	[]ZoneModel		`tfsdk:"zones"`
-	Name	types.String	`tfsdk:"name"`
+	Zones []ZoneModel  `tfsdk:"zones"`
+	Name  types.String `tfsdk:"name"`
 }
 
 type ZoneModel struct {
@@ -174,7 +174,7 @@ func (d *ZonesDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 			},
 			"name": schema.StringAttribute{
 				Optional: true,
-			},	
+			},
 		},
 	}
 }
@@ -316,10 +316,9 @@ func convertZoneSoaRecord(rec ZoneSoaRecordJson) ZoneSoaRecordModel {
 
 func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var state ZonesDataSourceModel
-	
 
 	resp.State.Get(ctx, &state)
-	
+
 	if state.Name != types.StringNull() {
 		var zoneJson ZoneJson
 		zonesResp, err := d.client.Get("zones/" + state.Name.ValueString())
