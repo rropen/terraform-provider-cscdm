@@ -165,7 +165,9 @@ func (p *CscDomainManagerProvider) DataSources(_ context.Context) []func() datas
 
 // Resources defines the resources implemented in the provider.
 func (p *CscDomainManagerProvider) Resources(_ context.Context) []func() resource.Resource {
-	return nil
+	return []func() resource.Resource{
+		NewRecordResource,
+	}
 }
 
 // New is a helper function to simplify provider server and testing implementation.
