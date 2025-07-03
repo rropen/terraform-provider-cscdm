@@ -15,7 +15,6 @@ type ZoneEditReq struct {
 }
 
 type ZoneEdit struct {
-	id          string `json:"-"`
 	RecordType  string `json:"recordType"`
 	Action      string `json:"action"`
 	NewKey      string `json:"newKey"`
