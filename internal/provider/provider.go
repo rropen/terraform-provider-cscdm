@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
+	"terraform-provider-csc-domain-manager/internal/cscdm"
 	"terraform-provider-csc-domain-manager/internal/util"
 )
 
@@ -100,22 +101,22 @@ func (p *CscDomainManagerProvider) Configure(ctx context.Context, req provider.C
 
 	// Default values to environment variables, but override
 	// with Terraform configuration value if set.
-	api_key := os.Getenv("CSCDM_API_KEY")
-	api_token := os.Getenv("CSCDM_API_TOKEN")
+	apiKey := os.Getenv("CSCDM_API_KEY")
+	apiToken := os.Getenv("CSCDM_API_TOKEN")
 
 	if !config.ApiKey.IsNull() {
-		api_key = config.ApiKey.ValueString()
+		apiKey = config.ApiKey.ValueString()
 	}
 
 	if !config.ApiToken.IsNull() {
-		api_token = config.ApiToken.ValueString()
+		apiToken = config.ApiToken.ValueString()
 	}
 
 	// If any of the expected configurations are missing, return
 	// errors with provider-specific guidance.
-	if api_key == "" {
+	if apiKey == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("api_key"),
+			path.Root("apiKey"),
 			"Missing CSC Domain Manager API Key",
 			"The provider cannot create the CSC Domain Manager API client as there is a missing or empty value for the API key. "+
 				"Set the host value in the configuration or use the CSCDM_API_KEY environment variable. "+
@@ -123,9 +124,9 @@ func (p *CscDomainManagerProvider) Configure(ctx context.Context, req provider.C
 		)
 	}
 
-	if api_token == "" {
+	if apiToken == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("api_key"),
+			path.Root("apiToken"),
 			"Missing CSC Domain Manager API Token",
 			"The provider cannot create the CSC Domain Manager API client as there is a missing or empty value for the API token. "+
 				"Set the host value in the configuration or use the CSCDM_API_TOKEN environment variable. "+
@@ -137,20 +138,24 @@ func (p *CscDomainManagerProvider) Configure(ctx context.Context, req provider.C
 		return
 	}
 
-	ctx = tflog.SetField(ctx, "cscdm_api_key", api_key)
-	ctx = tflog.SetField(ctx, "cscdm_api_token", api_token)
+	ctx = tflog.SetField(ctx, "cscdm_api_key", apiKey)
+	ctx = tflog.SetField(ctx, "cscdm_api_token", apiToken)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "cscdm_api_key", "cscdm_api_token")
 
 	// Make HTTP client available during DataSource and Resource Configure methods.
-	client := &http.Client{Transport: &util.HttpTransport{
+	http := &http.Client{Transport: &util.HttpTransport{
 		BaseUrl: CSC_DOMAIN_MANAGER_API_URL,
 		Headers: map[string]string{
 			"accept":        "application/json",
-			"apikey":        api_key,
-			"Authorization": fmt.Sprintf("Bearer %s", api_token),
+			"apikey":        apiKey,
+			"Authorization": fmt.Sprintf("Bearer %s", apiToken),
 		},
 	}}
-	resp.DataSourceData = client
+
+	client := &cscdm.Client{}
+	client.Configure(apiKey, apiToken)
+
+	resp.DataSourceData = http
 	resp.ResourceData = client
 
 	tflog.Info(ctx, "Configured CSC Domain Manager client")
