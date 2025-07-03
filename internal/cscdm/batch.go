@@ -36,15 +36,17 @@ func (c *Client) genId(zone string, recordType string, key string) string {
 }
 
 func (c *Client) clear() {
+	c.batchMutex.Lock()
+	c.returnChannelsMutex.Lock()
+	defer c.batchMutex.Unlock()
+	defer c.returnChannelsMutex.Unlock()
+
 	// Clear queue
 	c.recordActionQueue = nil
 
 	// Close pending return channels and clear
-	c.returnChannelsMutex.Lock()
 	for _, channel := range c.returnChannels {
 		close(channel)
 	}
 	c.returnChannels = make(map[string]chan *ZoneRecord)
-	c.returnChannelsMutex.Unlock()
-
 }
