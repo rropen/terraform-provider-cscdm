@@ -329,9 +329,9 @@ func (c *Client) GetRecordsByType(zone *Zone, recordType string) []ZoneRecord {
 }
 
 func (c *Client) GetRecordByKey(records []ZoneRecord, key string) *ZoneRecord {
-	for _, record := range records {
+	for i, record := range records {
 		if record.Key == key {
-			return &record
+			return &records[i]
 		}
 	}
 
@@ -359,9 +359,9 @@ func (c *Client) GetRecordsByKeys(records []ZoneRecord, keys []string) map[strin
 	}
 
 	recordMap := make(map[string]*ZoneRecord)
-	for _, record := range records {
+	for i, record := range records {
 		if keySet[record.Key] {
-			recordMap[record.Key] = &record
+			recordMap[record.Key] = &records[i]
 		}
 	}
 
