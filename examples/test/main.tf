@@ -8,7 +8,9 @@ terraform {
 
 provider "cscdm" {}
 
-data "cscdm_zones" "all" {}
+data "cscdm_zones" "all" {
+  name = "rollsroyce-sf.com"
+}
 
 output "all_zones" {
   value = data.cscdm_zones.all
