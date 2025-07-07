@@ -104,7 +104,7 @@ func (c *Client) PerformRecordAction(payload *RecordAction) (*ZoneRecord, error)
 
 	zoneRecord, ok := <-returnChan
 	if !ok {
-		return nil, fmt.Errorf("return channel closed for %s %s in %s", payload.RecordType, payload.ZoneEdit.KeyId(), payload.ZoneName)
+		return nil, fmt.Errorf("return channel closed for %s %s in %s", payload.RecordType, payload.KeyId(), payload.ZoneName)
 	}
 
 	return zoneRecord, nil

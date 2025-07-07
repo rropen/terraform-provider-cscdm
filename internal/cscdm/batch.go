@@ -16,7 +16,7 @@ func (c *Client) enqueue(recordAction *RecordAction, channel chan *ZoneRecord) {
 
 	c.recordActionQueue = append(c.recordActionQueue, recordAction)
 
-	id := c.genId(recordAction.ZoneName, recordAction.RecordType, recordAction.ZoneEdit.KeyId())
+	id := c.genId(recordAction.ZoneName, recordAction.RecordType, recordAction.KeyId())
 	c.returnChannels[id] = channel
 
 	c.triggerFlush()
