@@ -15,12 +15,24 @@ type ZoneEditReq struct {
 }
 
 type ZoneEdit struct {
-	RecordType  string `json:"recordType"`
-	Action      string `json:"action"`
-	NewKey      string `json:"newKey"`
-	NewValue    string `json:"newValue"`
-	NewTtl      int64  `json:"newTtl,omitempty"`
-	NewPriority int64  `json:"newPriority,omitempty"`
+	RecordType      string `json:"recordType"`
+	Action          string `json:"action"`
+	CurrentKey      string `json:"currentKey,omitempty"`
+	CurrentValue    string `json:"currentValue,omitempty"`
+	CurrentTtl      int64  `json:"currentTtl,omitempty"`
+	CurrentPriority int64  `json:"currentPriority,omitempty"`
+	NewKey          string `json:"newKey,omitempty"`
+	NewValue        string `json:"newValue,omitempty"`
+	NewTtl          int64  `json:"newTtl,omitempty"`
+	NewPriority     int64  `json:"newPriority,omitempty"`
+}
+
+func (ze *ZoneEdit) KeyId() string {
+	if ze.RecordType == "ADD" || ze.RecordType == "EDIT" {
+		return ze.NewKey
+	} else {
+		return ze.CurrentKey
+	}
 }
 
 type ZoneEditRes struct {
@@ -86,13 +98,13 @@ type ZoneSoaRecord struct {
 	MasterHost string `json:"masterHost"`
 }
 
-func (c *Client) CreateRecord(payload *RecordAction) (*ZoneRecord, error) {
-	recordChan := make(chan *ZoneRecord, 1)
-	c.enqueue(payload, recordChan)
+func (c *Client) PerformRecordAction(payload *RecordAction) (*ZoneRecord, error) {
+	returnChan := make(chan *ZoneRecord, 1)
+	c.enqueue(payload, returnChan)
 
-	zoneRecord, ok := <-recordChan
+	zoneRecord, ok := <-returnChan
 	if !ok {
-		return nil, fmt.Errorf("record channel closed for %s %s in %s", payload.Type, payload.Key, payload.ZoneName)
+		return nil, fmt.Errorf("return channel closed for %s %s in %s", payload.RecordType, payload.ZoneEdit.KeyId(), payload.ZoneName)
 	}
 
 	return zoneRecord, nil
@@ -100,20 +112,24 @@ func (c *Client) CreateRecord(payload *RecordAction) (*ZoneRecord, error) {
 
 func (c *Client) editZones() error {
 	c.batchMutex.Lock()
-	defer c.batchMutex.Unlock()
 	defer c.clear()
+	defer c.batchMutex.Unlock()
 
 	zoneEdits := make(map[string][]ZoneEdit)
 	for _, recordAction := range c.recordActionQueue {
 		zoneEdits[recordAction.ZoneName] = append(
 			zoneEdits[recordAction.ZoneName],
 			ZoneEdit{
-				RecordType:  recordAction.Type,
-				Action:      recordAction.Action,
-				NewKey:      recordAction.Key,
-				NewValue:    recordAction.Value,
-				NewTtl:      recordAction.Ttl,
-				NewPriority: recordAction.Priority,
+				RecordType:      recordAction.RecordType,
+				Action:          recordAction.Action,
+				CurrentKey:      recordAction.CurrentKey,
+				CurrentValue:    recordAction.CurrentValue,
+				CurrentTtl:      recordAction.CurrentTtl,
+				CurrentPriority: recordAction.CurrentPriority,
+				NewKey:          recordAction.NewKey,
+				NewValue:        recordAction.NewValue,
+				NewTtl:          recordAction.NewTtl,
+				NewPriority:     recordAction.NewPriority,
 			},
 		)
 	}
@@ -143,41 +159,41 @@ func (c *Client) editZones() error {
 				return
 			}
 
-			zone, err := c.FetchZone(payload.ZoneName)
-			if err != nil {
-				errChan <- err
-				return
-			}
-
 			recordsByType := make(map[string][]string)
+
 			for _, edit := range payload.Edits {
-				// TODO: use CurrentKey for update/delete
-				recordsByType[edit.RecordType] = append(recordsByType[edit.RecordType], edit.NewKey)
+				if edit.Action == "PURGE" {
+					err := c.returnRecord(payload.ZoneName, edit.RecordType, edit.KeyId(), nil)
+					if err != nil {
+						errChan <- err
+						return
+					}
+				} else {
+					recordsByType[edit.RecordType] = append(recordsByType[edit.RecordType], edit.KeyId())
+				}
 			}
 
-			for recordType, keys := range recordsByType {
-				records := c.GetRecordsByType(zone, recordType)
-				if records == nil {
-					errChan <- fmt.Errorf("unsupported record type: %s", recordType)
+			if len(recordsByType) > 0 {
+				zone, err := c.FetchZone(payload.ZoneName)
+				if err != nil {
+					errChan <- err
 					return
 				}
 
-				for key, record := range c.GetRecordsByKeys(records, keys) {
-					id := c.genId(payload.ZoneName, recordType, key)
-
-					c.returnChannelsMutex.Lock()
-					returnChan, ok := c.returnChannels[id]
-					if ok {
-						delete(c.returnChannels, id)
-					}
-					c.returnChannelsMutex.Unlock()
-					if !ok {
-						errChan <- fmt.Errorf("failed to get return channel for %s", id)
+				for recordType, keys := range recordsByType {
+					records := c.GetRecordsByType(zone, recordType)
+					if records == nil {
+						errChan <- fmt.Errorf("unsupported record type: %s", recordType)
 						return
 					}
 
-					returnChan <- record
-					close(returnChan)
+					for key, record := range c.GetRecordsByKeys(records, keys) {
+						err := c.returnRecord(payload.ZoneName, recordType, key, record)
+						if err != nil {
+							errChan <- err
+							return
+						}
+					}
 				}
 			}
 		}(payload)
@@ -257,6 +273,24 @@ func (c *Client) waitForZoneEdits(editId string) error {
 
 		time.Sleep(POLL_INTERVAL)
 	}
+}
+
+func (c *Client) returnRecord(zone string, recordType string, key string, record *ZoneRecord) error {
+	id := c.genId(zone, recordType, key)
+
+	c.returnChannelsMutex.Lock()
+	returnChan, ok := c.returnChannels[id]
+	if ok {
+		delete(c.returnChannels, id)
+	}
+	c.returnChannelsMutex.Unlock()
+	if !ok {
+		return fmt.Errorf("failed to get return channel for %s", id)
+	}
+
+	returnChan <- record
+	close(returnChan)
+	return nil
 }
 
 func (c *Client) FetchZone(zoneName string) (*Zone, error) {

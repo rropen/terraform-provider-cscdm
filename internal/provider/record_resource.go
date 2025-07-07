@@ -132,16 +132,18 @@ func (r *RecordResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	recordAction := cscdm.RecordAction{
-		Action:   "ADD",
+		ZoneEdit: cscdm.ZoneEdit{
+			Action:      "ADD",
+			RecordType:  plan.Type.ValueString(),
+			NewKey:      plan.Key.ValueString(),
+			NewValue:    plan.Value.ValueString(),
+			NewTtl:      plan.Ttl.ValueInt64(),
+			NewPriority: plan.Priority.ValueInt64(),
+		},
 		ZoneName: plan.ZoneName.ValueString(),
-		Type:     plan.Type.ValueString(),
-		Key:      plan.Key.ValueString(),
-		Value:    plan.Value.ValueString(),
-		Ttl:      plan.Ttl.ValueInt64(),
-		Priority: plan.Priority.ValueInt64(),
 	}
 
-	zoneRecord, err := r.client.CreateRecord(&recordAction)
+	zoneRecord, err := r.client.PerformRecordAction(&recordAction)
 	if err != nil {
 		resp.Diagnostics.AddError("error creating record", err.Error())
 		return
@@ -167,13 +169,13 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	zone, err := r.client.FetchZone(state.ZoneName.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("error fetching zone: %s", err.Error())
+		resp.Diagnostics.AddError("error fetching zone", err.Error())
 		return
 	}
 
 	record, err := r.client.GetRecord(zone, state.Type.ValueString(), state.Key.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("error getting record from zone: %s", err.Error())
+		resp.Diagnostics.AddError("error getting record from zone", err.Error())
 		return
 	}
 
@@ -186,8 +188,73 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *RecordResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	// Retrieve values from plan
+	var plan RecordResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Retrieve current state
+	var state RecordResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	recordAction := cscdm.RecordAction{
+		ZoneEdit: cscdm.ZoneEdit{
+			Action:       "EDIT",
+			RecordType:   state.Type.ValueString(),
+			CurrentKey:   state.Key.ValueString(),
+			CurrentValue: state.Value.ValueString(),
+			NewKey:       plan.Key.ValueString(),
+			NewValue:     plan.Value.ValueString(),
+			NewTtl:       plan.Ttl.ValueInt64(),
+			NewPriority:  plan.Priority.ValueInt64(),
+		},
+		ZoneName: plan.ZoneName.ValueString(),
+	}
+
+	zoneRecord, err := r.client.PerformRecordAction(&recordAction)
+	if err != nil {
+		resp.Diagnostics.AddError("error updating record", err.Error())
+		return
+	}
+
+	copyRecord(&plan, zoneRecord)
+	plan.LastUpdated = types.StringValue(time.Now().Format(time.RFC850))
+
+	// Set state to fully populated data
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *RecordResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	// Retrieve current state
+	var state RecordResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	recordAction := cscdm.RecordAction{
+		ZoneEdit: cscdm.ZoneEdit{
+			Action:       "PURGE",
+			RecordType:   state.Type.ValueString(),
+			CurrentKey:   state.Key.ValueString(),
+			CurrentValue: state.Value.ValueString(),
+		},
+		ZoneName: state.ZoneName.ValueString(),
+	}
+
+	_, err := r.client.PerformRecordAction(&recordAction)
+	if err != nil {
+		resp.Diagnostics.AddError("error updating record", err.Error())
+		return
+	}
 }

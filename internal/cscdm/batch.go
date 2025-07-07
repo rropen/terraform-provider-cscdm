@@ -4,13 +4,8 @@ import "fmt"
 
 // Record represents a planned DNS record.
 type RecordAction struct {
-	Action   string
+	ZoneEdit
 	ZoneName string
-	Type     string
-	Key      string
-	Value    string
-	Ttl      int64
-	Priority int64
 }
 
 func (c *Client) enqueue(recordAction *RecordAction, channel chan *ZoneRecord) {
@@ -21,7 +16,7 @@ func (c *Client) enqueue(recordAction *RecordAction, channel chan *ZoneRecord) {
 
 	c.recordActionQueue = append(c.recordActionQueue, recordAction)
 
-	id := c.genId(recordAction.ZoneName, recordAction.Type, recordAction.Key)
+	id := c.genId(recordAction.ZoneName, recordAction.RecordType, recordAction.ZoneEdit.KeyId())
 	c.returnChannels[id] = channel
 
 	c.triggerFlush()
@@ -45,8 +40,8 @@ func (c *Client) clear() {
 	c.recordActionQueue = nil
 
 	// Close pending return channels and clear
-	for _, channel := range c.returnChannels {
-		close(channel)
+	for _, returnChan := range c.returnChannels {
+		close(returnChan)
 	}
 	c.returnChannels = make(map[string]chan *ZoneRecord)
 }
