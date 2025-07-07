@@ -332,6 +332,7 @@ func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read desired zone, got error: %s", err))
 			return
 		}
+		defer zonesResp.Body.Close()
 		err = json.NewDecoder(zonesResp.Body).Decode(&zoneJson)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal desired zone, got error: %s", err))
