@@ -28,7 +28,7 @@ type ZoneEdit struct {
 }
 
 func (ze *ZoneEdit) KeyId() string {
-	if ze.RecordType == "ADD" || ze.RecordType == "EDIT" {
+	if ze.Action == "ADD" || ze.Action == "EDIT" {
 		return ze.NewKey
 	} else {
 		return ze.CurrentKey
