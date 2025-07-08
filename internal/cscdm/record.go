@@ -35,6 +35,14 @@ func (ze *ZoneEdit) KeyId() string {
 	}
 }
 
+func (ze *ZoneEdit) ValueId() string {
+	if ze.Action == "ADD" || ze.Action == "EDIT" {
+		return ze.NewValue
+	} else {
+		return ze.CurrentValue
+	}
+}
+
 type ZoneEditRes struct {
 	Content struct {
 		Status  string `json:"status"`
@@ -159,11 +167,13 @@ func (c *Client) editZones() error {
 				return
 			}
 
+			c.invalidateZoneCache(payload.ZoneName)
+
 			recordsByType := make(map[string][]string)
 
 			for _, edit := range payload.Edits {
 				if edit.Action == "PURGE" {
-					err := c.returnRecord(payload.ZoneName, edit.RecordType, edit.KeyId(), nil)
+					err := c.returnRecord(payload.ZoneName, edit.RecordType, edit.KeyId(), edit.ValueId(), nil)
 					if err != nil {
 						errChan <- err
 						return
@@ -174,7 +184,7 @@ func (c *Client) editZones() error {
 			}
 
 			if len(recordsByType) > 0 {
-				zone, err := c.FetchZone(payload.ZoneName)
+				zone, err := c.GetZone(payload.ZoneName)
 				if err != nil {
 					errChan <- err
 					return
@@ -188,7 +198,7 @@ func (c *Client) editZones() error {
 					}
 
 					for key, record := range c.GetRecordsByKeys(records, keys) {
-						err := c.returnRecord(payload.ZoneName, recordType, key, record)
+						err := c.returnRecord(payload.ZoneName, recordType, key, record.Value, record)
 						if err != nil {
 							errChan <- err
 							return
@@ -275,8 +285,8 @@ func (c *Client) waitForZoneEdits(editId string) error {
 	}
 }
 
-func (c *Client) returnRecord(zone string, recordType string, key string, record *ZoneRecord) error {
-	id := c.genId(zone, recordType, key)
+func (c *Client) returnRecord(zone string, recordType string, key string, value string, record *ZoneRecord) error {
+	id := c.genId(zone, recordType, key, value)
 
 	c.returnChannelsMutex.Lock()
 	returnChan, ok := c.returnChannels[id]
@@ -293,6 +303,13 @@ func (c *Client) returnRecord(zone string, recordType string, key string, record
 	return nil
 }
 
+func (c *Client) invalidateZoneCache(zoneName string) {
+	c.cacheMutex.Lock()
+	defer c.cacheMutex.Unlock()
+
+	delete(c.zoneCache, zoneName)
+}
+
 func (c *Client) FetchZone(zoneName string) (*Zone, error) {
 	zoneResp, err := c.http.Get(fmt.Sprintf("zones/%s", zoneName))
 	if err != nil {
@@ -300,13 +317,45 @@ func (c *Client) FetchZone(zoneName string) (*Zone, error) {
 	}
 	defer zoneResp.Body.Close()
 
-	var zoneJson Zone
-	err = json.NewDecoder(zoneResp.Body).Decode(&zoneJson)
+	var zone Zone
+	err = json.NewDecoder(zoneResp.Body).Decode(&zone)
 	if err != nil {
 		return nil, fmt.Errorf("unable to unmarshal zone: %s", err)
 	}
 
-	return &zoneJson, nil
+	c.cacheMutex.Lock()
+	c.zoneCache[zoneName] = &zone
+	c.cacheMutex.Unlock()
+
+	return &zone, nil
+}
+
+func (c *Client) GetZone(zoneName string) (*Zone, error) {
+	c.cacheMutex.RLock()
+	zone, ok := c.zoneCache[zoneName]
+	c.cacheMutex.RUnlock()
+
+	if ok {
+		return zone, nil
+	}
+
+	res, err, _ := c.zoneGroup.Do(zoneName, func() (interface{}, error) {
+		zone, err := c.FetchZone(zoneName)
+		if err != nil {
+			return nil, err
+		}
+
+		c.cacheMutex.Lock()
+		c.zoneCache[zoneName] = zone
+		c.cacheMutex.Unlock()
+		return zone, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return res.(*Zone), nil
 }
 
 func (c *Client) GetRecordsByType(zone *Zone, recordType string) []ZoneRecord {
@@ -338,7 +387,17 @@ func (c *Client) GetRecordByKey(records []ZoneRecord, key string) *ZoneRecord {
 	return nil
 }
 
-func (c *Client) GetRecord(zone *Zone, recordType string, key string) (*ZoneRecord, error) {
+func (c *Client) GetRecordById(records []ZoneRecord, id string) *ZoneRecord {
+	for i, record := range records {
+		if record.Id == id {
+			return &records[i]
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) GetRecordByTypeByKey(zone *Zone, recordType string, key string) (*ZoneRecord, error) {
 	records := c.GetRecordsByType(zone, recordType)
 	if records == nil {
 		return nil, fmt.Errorf("unsupported record type: %s", recordType)
@@ -347,6 +406,20 @@ func (c *Client) GetRecord(zone *Zone, recordType string, key string) (*ZoneReco
 	record := c.GetRecordByKey(records, key)
 	if record == nil {
 		return nil, fmt.Errorf("record of type %s with key '%s' was not found in zone %s", recordType, key, zone.ZoneName)
+	}
+
+	return record, nil
+}
+
+func (c *Client) GetRecordByTypeById(zone *Zone, recordType string, id string) (*ZoneRecord, error) {
+	records := c.GetRecordsByType(zone, recordType)
+	if records == nil {
+		return nil, fmt.Errorf("unsupported record type: %s", recordType)
+	}
+
+	record := c.GetRecordById(records, id)
+	if record == nil {
+		return nil, fmt.Errorf("record of type %s with id '%s' was not found in zone %s", recordType, id, zone.ZoneName)
 	}
 
 	return record, nil

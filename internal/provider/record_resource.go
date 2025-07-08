@@ -3,10 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"terraform-provider-csc-domain-manager/internal/cscdm"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -17,8 +19,9 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource              = &RecordResource{}
-	_ resource.ResourceWithConfigure = &RecordResource{}
+	_ resource.Resource                = &RecordResource{}
+	_ resource.ResourceWithConfigure   = &RecordResource{}
+	_ resource.ResourceWithImportState = &RecordResource{}
 )
 
 // NewRecordResource is a helper function to simplify the provider implementation.
@@ -34,6 +37,7 @@ type RecordResource struct {
 type RecordResourceModel struct {
 	ZoneName    types.String `tfsdk:"zone_name"`
 	Type        types.String `tfsdk:"type"`
+	Id          types.String `tfsdk:"id"`
 	Key         types.String `tfsdk:"key"`
 	Value       types.String `tfsdk:"value"`
 	Ttl         types.Int64  `tfsdk:"ttl"`
@@ -65,6 +69,9 @@ func (r *RecordResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
+			},
+			"id": schema.StringAttribute{
+				Computed: true,
 			},
 			"key": schema.StringAttribute{
 				Required: true,
@@ -111,6 +118,7 @@ func (r *RecordResource) Configure(_ context.Context, req resource.ConfigureRequ
 }
 
 func copyRecord(dst *RecordResourceModel, src *cscdm.ZoneRecord) {
+	dst.Id = types.StringValue(src.Id)
 	dst.Key = types.StringValue(src.Key)
 	dst.Value = types.StringValue(src.Value)
 
@@ -175,13 +183,13 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	zone, err := r.client.FetchZone(state.ZoneName.ValueString())
+	zone, err := r.client.GetZone(state.ZoneName.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("error fetching zone", err.Error())
 		return
 	}
 
-	record, err := r.client.GetRecord(zone, state.Type.ValueString(), state.Key.ValueString())
+	record, err := r.client.GetRecordByTypeById(zone, state.Type.ValueString(), state.Id.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("error getting record from zone", err.Error())
 		return
@@ -265,4 +273,20 @@ func (r *RecordResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		resp.Diagnostics.AddError("error updating record", err.Error())
 		return
 	}
+}
+
+func (r *RecordResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	idParts := strings.Split(req.ID, ":")
+
+	if len(idParts) != 3 || idParts[0] == "" || idParts[1] == "" || idParts[2] == "" {
+		resp.Diagnostics.AddError(
+			"unexpected import identifier",
+			fmt.Sprintf("expected import identifier with format: `zone:type:id`, got: %q", req.ID),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("zone_name"), idParts[0])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("type"), idParts[1])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), idParts[2])...)
 }

@@ -7,6 +7,8 @@ import (
 	"sync"
 	"terraform-provider-csc-domain-manager/internal/util"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -25,6 +27,10 @@ type Client struct {
 
 	flushTrigger      *sync.Cond
 	flushLoopStopChan chan struct{}
+
+	zoneCache  map[string]*Zone
+	zoneGroup  singleflight.Group
+	cacheMutex sync.RWMutex
 }
 
 func (c *Client) Configure(apiKey string, apiToken string) {
@@ -41,6 +47,8 @@ func (c *Client) Configure(apiKey string, apiToken string) {
 
 	c.flushTrigger = sync.NewCond(&sync.Mutex{})
 	c.flushLoopStopChan = make(chan struct{})
+
+	c.zoneCache = make(map[string]*Zone)
 
 	go c.flushLoop()
 }

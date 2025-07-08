@@ -16,7 +16,7 @@ func (c *Client) enqueue(recordAction *RecordAction, channel chan *ZoneRecord) {
 
 	c.recordActionQueue = append(c.recordActionQueue, recordAction)
 
-	id := c.genId(recordAction.ZoneName, recordAction.RecordType, recordAction.KeyId())
+	id := c.genId(recordAction.ZoneName, recordAction.RecordType, recordAction.KeyId(), recordAction.ValueId())
 	c.returnChannels[id] = channel
 
 	c.triggerFlush()
@@ -26,8 +26,8 @@ func (c *Client) flush() error {
 	return c.editZones()
 }
 
-func (c *Client) genId(zone string, recordType string, key string) string {
-	return fmt.Sprintf("%s:%s:%s", zone, recordType, key)
+func (c *Client) genId(zone string, recordType string, key string, value string) string {
+	return fmt.Sprintf("%s:%s:%s:%s", zone, recordType, key, value)
 }
 
 func (c *Client) clear() {
