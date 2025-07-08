@@ -355,7 +355,12 @@ func (c *Client) GetZone(zoneName string) (*Zone, error) {
 		return nil, err
 	}
 
-	return res.(*Zone), nil
+	zone, ok = res.(*Zone)
+	if !ok {
+		return nil, fmt.Errorf("failed to assert type for *zone")
+	}
+
+	return zone, nil
 }
 
 func (c *Client) GetRecordsByType(zone *Zone, recordType string) []ZoneRecord {
