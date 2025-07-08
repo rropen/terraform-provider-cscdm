@@ -39,5 +39,6 @@ resource "cscdm_record" "www_example_com" {
 
 ### Read-Only
 
+- `id` (String) The ID of this resource.
 - `last_updated` (String)
 - `status` (String)
