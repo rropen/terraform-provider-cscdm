@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -157,13 +158,13 @@ func (c *Client) editZones() error {
 
 			editId, err := c.editZone(payload)
 			if err != nil {
-				errChan <- err
+				errChan <- fmt.Errorf("failed to edit zone %s: %s", payload.ZoneName, err)
 				return
 			}
 
 			err = c.waitForZoneEdits(*editId)
 			if err != nil {
-				errChan <- err
+				errChan <- fmt.Errorf("failed to wait for %s zone edits: %s", payload.ZoneName, err)
 				return
 			}
 
@@ -281,6 +282,14 @@ func (c *Client) waitForZoneEdits(editId string) error {
 			return nil
 		}
 
+		if editStatusJson.Content.Status == "FAILED" {
+			err = c.cancelZoneEdit(editId)
+			if err != nil {
+				return fmt.Errorf("zone edits returned status FAILED: failed to cancel zone edits: %s", err)
+			}
+			return fmt.Errorf("zone edits returned status FAILED: successfully canceled zone edits")
+		}
+
 		time.Sleep(POLL_INTERVAL)
 	}
 }
@@ -301,6 +310,31 @@ func (c *Client) returnRecord(zone string, recordType string, key string, value 
 	returnChan <- record
 	close(returnChan)
 	return nil
+}
+
+func (c *Client) cancelZoneEdit(editId string) error {
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("zones/edits/%s", editId), nil)
+	if err != nil {
+		return fmt.Errorf("unable to create request: %s", err)
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("unable to send request: %s", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == 204 {
+		return nil
+	}
+
+	var zeErr ZoneEditErr
+	err = json.NewDecoder(res.Body).Decode(&zeErr)
+	if err != nil {
+		return fmt.Errorf("unable to unmarshal zone edit cancellation error: %s", err)
+	}
+
+	return fmt.Errorf("failed to cancel zone edit: %s: %s: %q", zeErr.Code, zeErr.Description, zeErr.Value)
 }
 
 func (c *Client) invalidateZoneCache(zoneName string) {
