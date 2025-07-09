@@ -109,14 +109,21 @@ type ZoneSoaRecord struct {
 
 func (c *Client) PerformRecordAction(payload *RecordAction) (*ZoneRecord, error) {
 	returnChan := make(chan *ZoneRecord, 1)
-	c.enqueue(payload, returnChan)
+	errorChan := make(chan error, 1)
+	c.enqueue(payload, returnChan, errorChan)
 
-	zoneRecord, ok := <-returnChan
-	if !ok {
-		return nil, fmt.Errorf("return channel closed for %s %s in %s", payload.RecordType, payload.KeyId(), payload.ZoneName)
+	select {
+	case zoneRecord, ok := <-returnChan:
+		if !ok {
+			return nil, fmt.Errorf("return channel closed for %s %s in %s. CHECK TF WARN LOGS.", payload.RecordType, payload.KeyId(), payload.ZoneName)
+		}
+		return zoneRecord, nil
+	case err, ok := <-errorChan:
+		if !ok {
+			return nil, fmt.Errorf("error channel closed for %s %s in %s. CHECK TF WARN LOGS.", payload.RecordType, payload.KeyId(), payload.ZoneName)
+		}
+		return nil, err
 	}
-
-	return zoneRecord, nil
 }
 
 func (c *Client) editZones() error {
@@ -158,13 +165,23 @@ func (c *Client) editZones() error {
 
 			editId, err := c.editZone(payload)
 			if err != nil {
-				errChan <- fmt.Errorf("failed to edit zone %s: %s", payload.ZoneName, err)
+				err = fmt.Errorf("failed to edit zone %s: %s", payload.ZoneName, err)
+				rErr := c.returnErrorToZone(payload.ZoneName, err)
+
+				if rErr != nil {
+					errChan <- fmt.Errorf("failed to return error: %s", rErr)
+				}
 				return
 			}
 
 			err = c.waitForZoneEdits(*editId)
 			if err != nil {
-				errChan <- fmt.Errorf("failed to wait for %s zone edits: %s", payload.ZoneName, err)
+				err = fmt.Errorf("failed to wait for %s zone edits: %s", payload.ZoneName, err)
+				rErr := c.returnErrorToZone(payload.ZoneName, err)
+
+				if rErr != nil {
+					errChan <- fmt.Errorf("failed to return error: %s", rErr)
+				}
 				return
 			}
 
@@ -176,7 +193,11 @@ func (c *Client) editZones() error {
 				if edit.Action == "PURGE" {
 					err := c.returnRecord(payload.ZoneName, edit.RecordType, edit.KeyId(), edit.ValueId(), nil)
 					if err != nil {
-						errChan <- err
+						rErr := c.returnError(payload.ZoneName, edit.RecordType, edit.KeyId(), edit.ValueId(), err)
+
+						if rErr != nil {
+							errChan <- fmt.Errorf("failed to return error: %s", rErr)
+						}
 						return
 					}
 				} else {
@@ -187,21 +208,34 @@ func (c *Client) editZones() error {
 			if len(recordsByType) > 0 {
 				zone, err := c.GetZone(payload.ZoneName)
 				if err != nil {
-					errChan <- err
+					rErr := c.returnErrorToZone(payload.ZoneName, err)
+
+					if rErr != nil {
+						errChan <- fmt.Errorf("failed to return error: %s", rErr)
+					}
 					return
 				}
 
 				for recordType, keys := range recordsByType {
 					records := c.GetRecordsByType(zone, recordType)
 					if records == nil {
-						errChan <- fmt.Errorf("unsupported record type: %s", recordType)
+						err := fmt.Errorf("unsupported record type: %s", recordType)
+						rErr := c.returnErrorToZoneWithRecordType(payload.ZoneName, recordType, err)
+
+						if rErr != nil {
+							errChan <- fmt.Errorf("failed to return error: %s", rErr)
+						}
 						return
 					}
 
 					for key, record := range c.GetRecordsByKeys(records, keys) {
 						err := c.returnRecord(payload.ZoneName, recordType, key, record.Value, record)
 						if err != nil {
-							errChan <- err
+							rErr := c.returnError(payload.ZoneName, recordType, key, record.Value, err)
+
+							if rErr != nil {
+								errChan <- fmt.Errorf("failed to return error: %s", rErr)
+							}
 							return
 						}
 					}
@@ -309,6 +343,73 @@ func (c *Client) returnRecord(zone string, recordType string, key string, value 
 
 	returnChan <- record
 	close(returnChan)
+	return nil
+}
+
+func (c *Client) returnErrorByIdWithoutLock(id string, err error) error {
+	errorChan, ok := c.errorChannels[id]
+	if !ok {
+		return fmt.Errorf("failed to get error channel for %s", id)
+	}
+
+	errorChan <- err
+	delete(c.errorChannels, id)
+	close(errorChan)
+	return nil
+}
+
+func (c *Client) returnError(zone string, recordType string, key string, value string, err error) error {
+	c.returnChannelsMutex.Lock()
+	defer c.returnChannelsMutex.Unlock()
+
+	return c.returnErrorByIdWithoutLock(c.genId(zone, recordType, key, value), err)
+}
+
+func (c *Client) returnErrorToZone(zone string, err error) error {
+	c.returnChannelsMutex.Lock()
+	defer c.returnChannelsMutex.Unlock()
+
+	var rErrs []error
+
+	for id := range c.errorChannels {
+		if strings.Split(id, ":")[0] == zone {
+			rErr := c.returnErrorByIdWithoutLock(id, err)
+
+			if rErr != nil {
+				rErrs = append(rErrs, rErr)
+			}
+		}
+	}
+
+	if len(rErrs) > 0 {
+		return fmt.Errorf("failed to return error to %d in zone %s: %s", len(rErrs), zone, err)
+	}
+
+	return nil
+}
+
+func (c *Client) returnErrorToZoneWithRecordType(zone string, recordType string, err error) error {
+	c.returnChannelsMutex.Lock()
+	defer c.returnChannelsMutex.Unlock()
+
+	var rErrs []error
+
+	for id := range c.errorChannels {
+		idParts := strings.Split(id, ":")
+
+		if idParts[0] == zone && idParts[1] == recordType {
+			rErr := c.returnErrorByIdWithoutLock(id, err)
+
+			if rErr != nil {
+				rErrs = append(rErrs, rErr)
+			}
+		}
+	}
+
+	if len(rErrs) > 0 {
+		return fmt.Errorf("failed to return error to %d in zone %s: %s", len(rErrs), zone, err)
+	}
+
 	return nil
 }
 

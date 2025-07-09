@@ -22,6 +22,7 @@ type Client struct {
 
 	recordActionQueue   []*RecordAction
 	returnChannels      map[string]chan *ZoneRecord
+	errorChannels       map[string]chan error
 	batchMutex          sync.Mutex
 	returnChannelsMutex sync.Mutex
 
@@ -44,6 +45,7 @@ func (c *Client) Configure(apiKey string, apiToken string) {
 	}}
 
 	c.returnChannels = make(map[string]chan *ZoneRecord)
+	c.errorChannels = make(map[string]chan error)
 
 	c.flushTrigger = sync.NewCond(&sync.Mutex{})
 	c.flushLoopStopChan = make(chan struct{})

@@ -8,7 +8,7 @@ type RecordAction struct {
 	ZoneName string
 }
 
-func (c *Client) enqueue(recordAction *RecordAction, channel chan *ZoneRecord) {
+func (c *Client) enqueue(recordAction *RecordAction, returnChan chan *ZoneRecord, errorChan chan error) {
 	c.batchMutex.Lock()
 	c.returnChannelsMutex.Lock()
 	defer c.batchMutex.Unlock()
@@ -17,7 +17,8 @@ func (c *Client) enqueue(recordAction *RecordAction, channel chan *ZoneRecord) {
 	c.recordActionQueue = append(c.recordActionQueue, recordAction)
 
 	id := c.genId(recordAction.ZoneName, recordAction.RecordType, recordAction.KeyId(), recordAction.ValueId())
-	c.returnChannels[id] = channel
+	c.returnChannels[id] = returnChan
+	c.errorChannels[id] = errorChan
 
 	c.triggerFlush()
 }
@@ -44,4 +45,10 @@ func (c *Client) clear() {
 		close(returnChan)
 	}
 	c.returnChannels = make(map[string]chan *ZoneRecord)
+
+	// Close pending error channels and clear
+	for _, errorChan := range c.errorChannels {
+		close(errorChan)
+	}
+	c.errorChannels = make(map[string]chan error)
 }
