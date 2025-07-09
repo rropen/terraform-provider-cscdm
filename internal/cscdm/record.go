@@ -115,12 +115,12 @@ func (c *Client) PerformRecordAction(payload *RecordAction) (*ZoneRecord, error)
 	select {
 	case zoneRecord, ok := <-returnChan:
 		if !ok {
-			return nil, fmt.Errorf("return channel closed for %s %s in %s. CHECK TF WARN LOGS.", payload.RecordType, payload.KeyId(), payload.ZoneName)
+			return nil, fmt.Errorf("return channel closed for %s %s in %s: CHECK TF WARN LOGS", payload.RecordType, payload.KeyId(), payload.ZoneName)
 		}
 		return zoneRecord, nil
 	case err, ok := <-errorChan:
 		if !ok {
-			return nil, fmt.Errorf("error channel closed for %s %s in %s. CHECK TF WARN LOGS.", payload.RecordType, payload.KeyId(), payload.ZoneName)
+			return nil, fmt.Errorf("error channel closed for %s %s in %s: CHECK TF WARN LOGS", payload.RecordType, payload.KeyId(), payload.ZoneName)
 		}
 		return nil, err
 	}
