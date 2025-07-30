@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -27,7 +28,8 @@ type ZonesDataSource struct {
 }
 
 type ZonesDataSourceModel struct {
-	Zones []ZoneModel `tfsdk:"zones"`
+	Zones []ZoneModel  `tfsdk:"zones"`
+	Name  types.String `tfsdk:"name"`
 }
 
 type ZoneModel struct {
@@ -171,6 +173,9 @@ func (d *ZonesDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 					},
 				},
 			},
+			"name": schema.StringAttribute{
+				Optional: true,
+			},
 		},
 	}
 }
@@ -312,25 +317,47 @@ func convertZoneSoaRecord(rec ZoneSoaRecordJson) ZoneSoaRecordModel {
 
 func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var state ZonesDataSourceModel
+	var diags diag.Diagnostics
 
-	zonesResp, err := d.client.Get("zones")
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read zones, got error: %s", err))
+	diags = resp.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var zonesJson ZonesJson
-	err = json.NewDecoder(zonesResp.Body).Decode(&zonesJson)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal zones, got error: %s", err))
-		return
+	if state.Name != types.StringNull() {
+		var zoneJson ZoneJson
+		zonesResp, err := d.client.Get(fmt.Sprintf("zones/%s", state.Name.ValueString()))
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read desired zone, got error: %s", err))
+			return
+		}
+		defer zonesResp.Body.Close()
+		err = json.NewDecoder(zonesResp.Body).Decode(&zoneJson)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal desired zone, got error: %s", err))
+			return
+		}
+		state.Zones = append(state.Zones, convertZone(zoneJson))
+	} else {
+		var zonesJson ZonesJson
+		zonesResp, err := d.client.Get("zones")
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read zones, got error: %s", err))
+			return
+		}
+		defer zonesResp.Body.Close()
+		err = json.NewDecoder(zonesResp.Body).Decode(&zonesJson)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal zones, got error: %s", err))
+			return
+		}
+		for _, zone := range zonesJson.Zones {
+			state.Zones = append(state.Zones, convertZone(zone))
+		}
 	}
 
-	for _, zone := range zonesJson.Zones {
-		state.Zones = append(state.Zones, convertZone(zone))
-	}
-
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
