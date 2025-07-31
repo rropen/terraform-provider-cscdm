@@ -35,7 +35,7 @@ type RecordResource struct {
 }
 
 type RecordResourceModel struct {
-	ZoneName    types.String `tfsdk:"zone_name"`
+	Zone        types.String `tfsdk:"zone"`
 	Type        types.String `tfsdk:"type"`
 	Id          types.String `tfsdk:"id"`
 	Key         types.String `tfsdk:"key"`
@@ -55,7 +55,7 @@ func (r *RecordResource) Metadata(_ context.Context, req resource.MetadataReques
 func (r *RecordResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"zone_name": schema.StringAttribute{
+			"zone": schema.StringAttribute{
 				Required: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -156,7 +156,7 @@ func (r *RecordResource) Create(ctx context.Context, req resource.CreateRequest,
 			NewTtl:      plan.Ttl.ValueInt64(),
 			NewPriority: plan.Priority.ValueInt64(),
 		},
-		ZoneName: plan.ZoneName.ValueString(),
+		ZoneName: plan.Zone.ValueString(),
 	}
 
 	zoneRecord, err := r.client.PerformRecordAction(&recordAction)
@@ -183,7 +183,7 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	zone, err := r.client.GetZone(state.ZoneName.ValueString())
+	zone, err := r.client.GetZone(state.Zone.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("error fetching zone", err.Error())
 		return
@@ -231,7 +231,7 @@ func (r *RecordResource) Update(ctx context.Context, req resource.UpdateRequest,
 			NewTtl:       plan.Ttl.ValueInt64(),
 			NewPriority:  plan.Priority.ValueInt64(),
 		},
-		ZoneName: plan.ZoneName.ValueString(),
+		ZoneName: plan.Zone.ValueString(),
 	}
 
 	zoneRecord, err := r.client.PerformRecordAction(&recordAction)
@@ -265,7 +265,7 @@ func (r *RecordResource) Delete(ctx context.Context, req resource.DeleteRequest,
 			CurrentKey:   state.Key.ValueString(),
 			CurrentValue: state.Value.ValueString(),
 		},
-		ZoneName: state.ZoneName.ValueString(),
+		ZoneName: state.Zone.ValueString(),
 	}
 
 	_, err := r.client.PerformRecordAction(&recordAction)

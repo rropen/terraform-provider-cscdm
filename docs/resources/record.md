@@ -14,11 +14,11 @@ description: |-
 
 ```terraform
 resource "cscdm_record" "www_example_com" {
-  zone_name = "example.com"
-  type      = "A"
-  key       = "www"
-  value     = "127.0.0.1"
-  ttl       = 300
+  zone  = "example.com"
+  type  = "A"
+  key   = "www"
+  value = "127.0.0.1"
+  ttl   = 300
 }
 ```
 
@@ -30,7 +30,7 @@ resource "cscdm_record" "www_example_com" {
 - `key` (String)
 - `type` (String)
 - `value` (String)
-- `zone_name` (String)
+- `zone` (String)
 
 ### Optional
 
