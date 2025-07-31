@@ -1,7 +1,23 @@
-# Terraform Provider for CSC Domain Manager
+<p>
+    <img alt="Rolls-Royce Logo" width="100" src="https://raw.githubusercontent.com/rropen/MEC/main/src/frontend/public/logo4.png">
+    <br>
+    <h3>Terraform Provider for CSC Domain Manager</h3>
+</p>
+<p>
+<a href="https://ghdocs.rollsroyce-sf.com"><img src="https://img.shields.io/badge/Rolls--Royce-Software%20Factory-10069f" alt="sf badge" /></a>
+</p>
+
+---
+
+<p>
+  <a href="http://commitizen.github.io/cz-cli/"><img src="https://img.shields.io/badge/commitizen-friendly-brightgreen?style=flat" alt="commitizen badge" /></a>
+  <a href="https://go.dev/"><img src="https://img.shields.io/badge/golang-%2300ADD8.svg?style=flat&logo=go&logoColor=white" /></a>
+</p>
+
 This Terraform Provider allows managing DNS within CSC Domain Manager.
 
 ## Usage Example
+
 ```hcl
 terraform {
   required_providers {
