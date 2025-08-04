@@ -22,7 +22,7 @@ This Terraform Provider allows managing DNS within CSC Domain Manager.
 terraform {
   required_providers {
     cscdm = {
-      source = "registry.terraform.io/rolls-royce/csc-domain-manager"
+      source = "rropen/cscdm"
     }
   }
 }

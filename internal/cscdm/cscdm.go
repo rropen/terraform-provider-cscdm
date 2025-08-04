@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
-	"terraform-provider-csc-domain-manager/internal/util"
+	"terraform-provider-cscdm/internal/util"
 	"time"
 
 	"golang.org/x/sync/singleflight"

@@ -1,4 +1,4 @@
-module terraform-provider-csc-domain-manager
+module terraform-provider-cscdm
 
 go 1.23.7
 

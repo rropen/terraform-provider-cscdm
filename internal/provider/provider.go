@@ -14,8 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"terraform-provider-csc-domain-manager/internal/cscdm"
-	"terraform-provider-csc-domain-manager/internal/util"
+	"terraform-provider-cscdm/internal/cscdm"
+	"terraform-provider-cscdm/internal/util"
 )
 
 const (

@@ -5,7 +5,7 @@ import (
 	"flag"
 	"log"
 
-	"terraform-provider-csc-domain-manager/internal/provider"
+	"terraform-provider-cscdm/internal/provider"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
@@ -29,7 +29,7 @@ func main() {
 		// TODO: Update this string with the published name of your provider.
 		// Also update the tfplugindocs generate command to either remove the
 		// -provider-name flag or set its value to the updated provider name.
-		Address: "registry.terraform.io/rolls-royce/csc-domain-manager",
+		Address: "registry.terraform.io/rolls-royce/cscdm",
 		Debug:   debug,
 	}
 

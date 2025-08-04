@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"terraform-provider-csc-domain-manager/internal/cscdm"
+	"terraform-provider-cscdm/internal/cscdm"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
