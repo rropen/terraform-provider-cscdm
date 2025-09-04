@@ -26,7 +26,7 @@ type Client struct {
 	batchMutex          sync.Mutex
 	returnChannelsMutex sync.Mutex
 
-	flushTrigger      *sync.Cond
+	flushTrigger      chan struct{}
 	flushLoopStopChan chan struct{}
 	stopOnce          sync.Once
 
@@ -48,7 +48,7 @@ func (c *Client) Configure(apiKey string, apiToken string) {
 	c.returnChannels = make(map[string]chan *ZoneRecord)
 	c.errorChannels = make(map[string]chan error)
 
-	c.flushTrigger = sync.NewCond(&sync.Mutex{})
+	c.flushTrigger = make(chan struct{}, 1)
 	c.flushLoopStopChan = make(chan struct{})
 
 	c.zoneCache = make(map[string]*Zone)
@@ -57,50 +57,16 @@ func (c *Client) Configure(apiKey string, apiToken string) {
 }
 
 func (c *Client) flushLoop() {
-	// Single trigger channel used throughout lifetime
-	triggerChan := make(chan struct{}, 1)
-	// Start the trigger watcher goroutine
-	triggerStop := make(chan struct{})
-	go func() {
-		defer close(triggerChan) // Signal flushLoop to exit when we're done
-		for {
-			c.flushTrigger.L.Lock()
-			
-			// Check for stop before waiting
-			select {
-			case <-triggerStop:
-				c.flushTrigger.L.Unlock()
-				return
-			default:
-			}
-			
-			c.flushTrigger.Wait()
-			c.flushTrigger.L.Unlock()
-
-			// Check for stop after waking up
-			select {
-			case <-triggerStop:
-				return
-			default:
-				// Non-blocking send - if channel full, trigger already pending
-				select {
-				case triggerChan <- struct{}{}:
-				default:
-				}
-			}
-		}
-	}()
-
 	for {
 		flushTimer := time.NewTimer(FLUSH_IDLE_DURATION)
 
 		select {
-		case <-triggerChan:
+		case <-c.flushTrigger:
 			// Flush triggered; reset flush timer
 			flushTimer.Stop()
 			// Drain the channel in case of multiple signals
 			select {
-			case <-triggerChan:
+			case <-c.flushTrigger:
 			default:
 			}
 		case <-flushTimer.C:
@@ -114,27 +80,21 @@ func (c *Client) flushLoop() {
 		case <-c.flushLoopStopChan:
 			// Stop flush loop
 			flushTimer.Stop()
-			close(triggerStop) // Stop the trigger watcher
-			<-triggerChan      // Wait for it to close the channel
 			return
 		}
 	}
 }
 
 func (c *Client) triggerFlush() {
-	c.flushTrigger.L.Lock()
-	defer c.flushTrigger.L.Unlock()
-
-	c.flushTrigger.Signal()
+	// Non-blocking send - if channel full, trigger already pending
+	select {
+	case c.flushTrigger <- struct{}{}:
+	default:
+	}
 }
 
 func (c *Client) Stop() {
 	c.stopOnce.Do(func() {
 		close(c.flushLoopStopChan)
-		
-		// Wake up the trigger watcher so it can see the stop signal
-		c.flushTrigger.L.Lock()
-		c.flushTrigger.Signal()
-		c.flushTrigger.L.Unlock()
 	})
 }
