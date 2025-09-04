@@ -28,6 +28,7 @@ type Client struct {
 
 	flushTrigger      *sync.Cond
 	flushLoopStopChan chan struct{}
+	stopOnce          sync.Once
 
 	zoneCache  map[string]*Zone
 	zoneGroup  singleflight.Group
@@ -64,9 +65,19 @@ func (c *Client) flushLoop() {
 		defer close(triggerChan) // Signal flushLoop to exit when we're done
 		for {
 			c.flushTrigger.L.Lock()
+			
+			// Check for stop before waiting
+			select {
+			case <-triggerStop:
+				c.flushTrigger.L.Unlock()
+				return
+			default:
+			}
+			
 			c.flushTrigger.Wait()
 			c.flushTrigger.L.Unlock()
 
+			// Check for stop after waking up
 			select {
 			case <-triggerStop:
 				return
@@ -118,5 +129,12 @@ func (c *Client) triggerFlush() {
 }
 
 func (c *Client) Stop() {
-	close(c.flushLoopStopChan)
+	c.stopOnce.Do(func() {
+		close(c.flushLoopStopChan)
+		
+		// Wake up the trigger watcher so it can see the stop signal
+		c.flushTrigger.L.Lock()
+		c.flushTrigger.Signal()
+		c.flushTrigger.L.Unlock()
+	})
 }
