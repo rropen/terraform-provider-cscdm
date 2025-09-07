@@ -62,7 +62,7 @@ while read -r zone; do
 
         {
           echo "resource \"cscdm_record\" \"$name\" {"
-          echo "  zone_name = \"$raw_zone_name\""
+          echo "  zone      = \"$raw_zone_name\""
           echo "  type      = \"$type\""
           echo "  key       = \"$key\""
           echo "  value     = \"$value\""
