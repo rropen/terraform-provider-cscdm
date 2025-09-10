@@ -26,8 +26,9 @@ type Client struct {
 	batchMutex          sync.Mutex
 	returnChannelsMutex sync.Mutex
 
-	flushTrigger      *sync.Cond
+	flushTrigger      chan struct{}
 	flushLoopStopChan chan struct{}
+	stopOnce          sync.Once
 
 	zoneCache  map[string]*Zone
 	zoneGroup  singleflight.Group
@@ -47,7 +48,7 @@ func (c *Client) Configure(apiKey string, apiToken string) {
 	c.returnChannels = make(map[string]chan *ZoneRecord)
 	c.errorChannels = make(map[string]chan error)
 
-	c.flushTrigger = sync.NewCond(&sync.Mutex{})
+	c.flushTrigger = make(chan struct{}, 1)
 	c.flushLoopStopChan = make(chan struct{})
 
 	c.zoneCache = make(map[string]*Zone)
@@ -57,28 +58,24 @@ func (c *Client) Configure(apiKey string, apiToken string) {
 
 func (c *Client) flushLoop() {
 	for {
-		triggerChan := make(chan struct{})
-		go func() {
-			c.flushTrigger.L.Lock()
-			c.flushTrigger.Wait()
-			c.flushTrigger.L.Unlock()
-			close(triggerChan)
-		}()
-
 		flushTimer := time.NewTimer(FLUSH_IDLE_DURATION)
 
 		select {
-		case <-triggerChan:
+		case <-c.flushTrigger:
 			// Flush triggered; reset flush timer
 			flushTimer.Stop()
-			continue
+			// Drain the channel in case of multiple signals
+			select {
+			case <-c.flushTrigger:
+			default:
+			}
 		case <-flushTimer.C:
 			// Timer expired; flush queue
 			err := c.flush()
 
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to flush queue: %s", err.Error())
-				return
+				fmt.Fprintf(os.Stderr, "failed to flush queue: %s\n", err.Error())
+				// Continue - don't return/terminate
 			}
 		case <-c.flushLoopStopChan:
 			// Stop flush loop
@@ -89,12 +86,15 @@ func (c *Client) flushLoop() {
 }
 
 func (c *Client) triggerFlush() {
-	c.flushTrigger.L.Lock()
-	defer c.flushTrigger.L.Unlock()
-
-	c.flushTrigger.Signal()
+	// Non-blocking send - if channel full, trigger already pending
+	select {
+	case c.flushTrigger <- struct{}{}:
+	default:
+	}
 }
 
 func (c *Client) Stop() {
-	close(c.flushLoopStopChan)
+	c.stopOnce.Do(func() {
+		close(c.flushLoopStopChan)
+	})
 }
