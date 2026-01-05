@@ -15,6 +15,7 @@ const (
 	CSC_DOMAIN_MANAGER_API_URL = "https://apis.cscglobal.com/dbs/api/v2/"
 	POLL_INTERVAL              = 5 * time.Second
 	FLUSH_IDLE_DURATION        = 5 * time.Second
+	HTTP_REQUEST_TIMEOUT       = 30 * time.Second
 )
 
 type Client struct {
@@ -36,14 +37,16 @@ type Client struct {
 }
 
 func (c *Client) Configure(apiKey string, apiToken string) {
-	c.http = &http.Client{Transport: &util.HttpTransport{
-		BaseUrl: CSC_DOMAIN_MANAGER_API_URL,
-		Headers: map[string]string{
-			"accept":        "application/json",
-			"apikey":        apiKey,
-			"Authorization": fmt.Sprintf("Bearer %s", apiToken),
-		},
-	}}
+	c.http = &http.Client{
+		Timeout: HTTP_REQUEST_TIMEOUT,
+		Transport: &util.HttpTransport{
+			BaseUrl: CSC_DOMAIN_MANAGER_API_URL,
+			Headers: map[string]string{
+				"accept":        "application/json",
+				"apikey":        apiKey,
+				"Authorization": fmt.Sprintf("Bearer %s", apiToken),
+			},
+		}}
 
 	c.returnChannels = make(map[string]chan *ZoneRecord)
 	c.errorChannels = make(map[string]chan error)
