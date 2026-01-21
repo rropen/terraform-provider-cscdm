@@ -27,3 +27,4 @@ provider "cscdm" {
 
 - `api_key` (String, Sensitive) CSC Domain Manager API Key
 - `api_token` (String, Sensitive) CSC Domain Manager API Token
+- `base_url` (String) CSC Domain Manager API Base URL. Defaults to CSC Production API (https://apis.cscglobal.com/dbs/api/v2/)

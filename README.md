@@ -43,6 +43,17 @@ resource "cscdm_record" "www_example_com" {
 }
 ```
 
+To use the CSC Test environment
+```hcl
+provider "cscdm" {
+    ...
+
+    # This provider supports setting the base url for test environment usage via
+    # the field below or with the `CSCDM_BASE_URL` environment variable
+    base_url = "https://apis-ote.cscglobal.com/dbs/api/v2/"
+}
+```
+
 ## Development Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0

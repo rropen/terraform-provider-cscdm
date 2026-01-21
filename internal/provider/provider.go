@@ -39,6 +39,7 @@ type CscDomainManagerProvider struct {
 type CscDomainManagerProviderModel struct {
 	ApiKey   types.String `tfsdk:"api_key"`
 	ApiToken types.String `tfsdk:"api_token"`
+	BaseUrl  types.String `tfsdk:"base_url"`
 }
 
 // Metadata returns the provider type name.
@@ -60,6 +61,10 @@ func (p *CscDomainManagerProvider) Schema(_ context.Context, _ provider.SchemaRe
 				Description: "CSC Domain Manager API Token",
 				Optional:    true,
 				Sensitive:   true,
+			},
+			"base_url": schema.StringAttribute{
+				Description: fmt.Sprintf("CSC Domain Manager API Base URL. Defaults to CSC Production API (%s)", CSC_DOMAIN_MANAGER_API_URL),
+				Optional:    true,
 			},
 		},
 	}
@@ -103,6 +108,10 @@ func (p *CscDomainManagerProvider) Configure(ctx context.Context, req provider.C
 	// with Terraform configuration value if set.
 	apiKey := os.Getenv("CSCDM_API_KEY")
 	apiToken := os.Getenv("CSCDM_API_TOKEN")
+	baseUrl := os.Getenv("CSCDM_BASE_URL")
+	if baseUrl == "" {
+		baseUrl = CSC_DOMAIN_MANAGER_API_URL
+	}
 
 	if !config.ApiKey.IsNull() {
 		apiKey = config.ApiKey.ValueString()
@@ -110,6 +119,10 @@ func (p *CscDomainManagerProvider) Configure(ctx context.Context, req provider.C
 
 	if !config.ApiToken.IsNull() {
 		apiToken = config.ApiToken.ValueString()
+	}
+
+	if !config.BaseUrl.IsNull() {
+		baseUrl = config.BaseUrl.ValueString()
 	}
 
 	// If any of the expected configurations are missing, return
@@ -144,7 +157,7 @@ func (p *CscDomainManagerProvider) Configure(ctx context.Context, req provider.C
 
 	// Make HTTP client available during DataSource and Resource Configure methods.
 	http := &http.Client{Transport: &util.HttpTransport{
-		BaseUrl: CSC_DOMAIN_MANAGER_API_URL,
+		BaseUrl: baseUrl,
 		Headers: map[string]string{
 			"accept":        "application/json",
 			"apikey":        apiKey,
@@ -153,7 +166,7 @@ func (p *CscDomainManagerProvider) Configure(ctx context.Context, req provider.C
 	}}
 
 	client := &cscdm.Client{}
-	client.Configure(apiKey, apiToken)
+	client.Configure(apiKey, apiToken, baseUrl)
 
 	resp.DataSourceData = http
 	resp.ResourceData = client

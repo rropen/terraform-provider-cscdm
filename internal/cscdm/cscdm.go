@@ -12,10 +12,9 @@ import (
 )
 
 const (
-	CSC_DOMAIN_MANAGER_API_URL = "https://apis.cscglobal.com/dbs/api/v2/"
-	POLL_INTERVAL              = 5 * time.Second
-	FLUSH_IDLE_DURATION        = 5 * time.Second
-	HTTP_REQUEST_TIMEOUT       = 30 * time.Second
+	POLL_INTERVAL        = 5 * time.Second
+	FLUSH_IDLE_DURATION  = 5 * time.Second
+	HTTP_REQUEST_TIMEOUT = 30 * time.Second
 )
 
 type Client struct {
@@ -36,11 +35,11 @@ type Client struct {
 	cacheMutex sync.RWMutex
 }
 
-func (c *Client) Configure(apiKey string, apiToken string) {
+func (c *Client) Configure(apiKey string, apiToken string, baseUrl string) {
 	c.http = &http.Client{
 		Timeout: HTTP_REQUEST_TIMEOUT,
 		Transport: &util.HttpTransport{
-			BaseUrl: CSC_DOMAIN_MANAGER_API_URL,
+			BaseUrl: baseUrl,
 			Headers: map[string]string{
 				"accept":        "application/json",
 				"apikey":        apiKey,

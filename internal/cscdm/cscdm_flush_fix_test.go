@@ -43,7 +43,7 @@ func testGoroutineLeaks(t *testing.T) {
 	// Test that multiple client create/stop cycles work without accumulating issues
 	for cycle := 0; cycle < 5; cycle++ {
 		client := &cscdm.Client{}
-		client.Configure("test-key", "test-token")
+		client.Configure("test-key", "test-token", testBaseURL)
 
 		// Let it run briefly
 		time.Sleep(20 * time.Millisecond)
@@ -77,7 +77,7 @@ func testGoroutineLeaks(t *testing.T) {
 
 func testErrorResilience(t *testing.T) {
 	client := &cscdm.Client{}
-	client.Configure("invalid-key", "invalid-token") // Force API errors
+	client.Configure("invalid-key", "invalid-token", testBaseURL) // Force API errors
 
 	initialGoroutines := runtime.NumGoroutine()
 
@@ -111,7 +111,7 @@ func testErrorResilience(t *testing.T) {
 
 func testConcurrentAccess(t *testing.T) {
 	client := &cscdm.Client{}
-	client.Configure("test-key", "test-token")
+	client.Configure("test-key", "test-token", testBaseURL)
 
 	var wg sync.WaitGroup
 
@@ -141,7 +141,7 @@ func testConcurrentAccess(t *testing.T) {
 
 func testGracefulShutdown(t *testing.T) {
 	client := &cscdm.Client{}
-	client.Configure("test-key", "test-token")
+	client.Configure("test-key", "test-token", testBaseURL)
 
 	// Start background work
 	stop := make(chan bool)
@@ -184,7 +184,7 @@ func testGracefulShutdown(t *testing.T) {
 
 func testMultipleStops(t *testing.T) {
 	client := &cscdm.Client{}
-	client.Configure("test-key", "test-token")
+	client.Configure("test-key", "test-token", testBaseURL)
 
 	// Let client initialize
 	time.Sleep(10 * time.Millisecond)
