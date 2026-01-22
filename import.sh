@@ -54,7 +54,7 @@ while read -r zone; do
       while read -r record; do
         id=$(echo "$record" | jq -r '.id')
         key=$(echo "$record" | jq -r '.key')
-        value=$(echo "$record" | jq -r '.value')
+        value=$(echo "$record" | jq -r '.value' | sed s/\"/\\\\\"/g)
         ttl=$(echo "$record" | jq -r '.ttl // empty')
         priority=$(echo "$record" | jq -r '.priority // empty')
 
