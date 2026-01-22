@@ -17,7 +17,7 @@ func TestClient_GoroutineLeakPrevention(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		client := &cscdm.Client{}
-		client.Configure("test-key", "test-token")
+		client.Configure("test-key", "test-token", testBaseURL)
 		clients[i] = client
 
 		// Allow goroutines to start
@@ -50,7 +50,7 @@ func TestClient_GoroutineLeakPrevention(t *testing.T) {
 
 	// Test that we can create and stop another client without issues
 	testClient := &cscdm.Client{}
-	testClient.Configure("test-key", "test-token")
+	testClient.Configure("test-key", "test-token", testBaseURL)
 
 	done := make(chan bool, 1)
 	go func() {
@@ -69,7 +69,7 @@ func TestClient_GoroutineLeakPrevention(t *testing.T) {
 func TestClient_FlushErrorResilience(t *testing.T) {
 	// This test verifies that the flush loop continues running even after errors
 	client := &cscdm.Client{}
-	client.Configure("invalid-key", "invalid-token") // Force API errors
+	client.Configure("invalid-key", "invalid-token", testBaseURL) // Force API errors
 
 	initialGoroutines := runtime.NumGoroutine()
 
@@ -102,7 +102,7 @@ func TestClient_FlushErrorResilience(t *testing.T) {
 
 func TestClient_ConcurrentFlushTriggers(t *testing.T) {
 	client := &cscdm.Client{}
-	client.Configure("test-key", "test-token")
+	client.Configure("test-key", "test-token", testBaseURL)
 
 	initialGoroutines := runtime.NumGoroutine()
 
@@ -145,7 +145,7 @@ func TestClient_ConcurrentFlushTriggers(t *testing.T) {
 
 func TestClient_GracefulShutdown(t *testing.T) {
 	client := &cscdm.Client{}
-	client.Configure("test-key", "test-token")
+	client.Configure("test-key", "test-token", testBaseURL)
 
 	// Start multiple goroutines that trigger flushes
 	stopWorkers := make(chan bool)
@@ -191,7 +191,7 @@ func TestClient_GracefulShutdown(t *testing.T) {
 
 func TestClient_TriggerChannelDraining(t *testing.T) {
 	client := &cscdm.Client{}
-	client.Configure("test-key", "test-token")
+	client.Configure("test-key", "test-token", testBaseURL)
 
 	// Let the client run for a bit to test the flush loop
 	time.Sleep(50 * time.Millisecond)
@@ -216,7 +216,7 @@ func TestClient_TriggerChannelDraining(t *testing.T) {
 
 func TestClient_StopChannelCleanup(t *testing.T) {
 	client := &cscdm.Client{}
-	client.Configure("test-key", "test-token")
+	client.Configure("test-key", "test-token", testBaseURL)
 
 	// Let the client run for a bit
 	time.Sleep(10 * time.Millisecond)
