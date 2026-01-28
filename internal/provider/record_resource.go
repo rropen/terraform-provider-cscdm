@@ -191,7 +191,7 @@ func (r *RecordResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	record, err := r.client.GetRecordByTypeById(zone, state.Type.ValueString(), state.Id.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("error getting record from zone", err.Error())
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
