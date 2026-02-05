@@ -340,20 +340,26 @@ func (d *ZonesDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		}
 		state.Zones = append(state.Zones, convertZone(zoneJson))
 	} else {
-		var zonesJson ZonesJson
-		zonesResp, err := d.client.Get("zones")
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read zones, got error: %s", err))
-			return
-		}
-		defer zonesResp.Body.Close()
-		err = json.NewDecoder(zonesResp.Body).Decode(&zonesJson)
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal zones, got error: %s", err))
-			return
-		}
-		for _, zone := range zonesJson.Zones {
-			state.Zones = append(state.Zones, convertZone(zone))
+		for page := int64(1); ; page++ {
+			var zonesJson ZonesJson
+			zonesResp, err := d.client.Get(fmt.Sprintf("zones?page=%d", page))
+			if err != nil {
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read zones, got error: %s", err))
+				return
+			}
+			err = json.NewDecoder(zonesResp.Body).Decode(&zonesJson)
+			if err != nil {
+				zonesResp.Body.Close()
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to unmarshal zones, got error: %s", err))
+				return
+			}
+			zonesResp.Body.Close()
+			for _, zone := range zonesJson.Zones {
+				state.Zones = append(state.Zones, convertZone(zone))
+			}
+			if page >= zonesJson.Meta.Pages {
+				break
+			}
 		}
 	}
 
