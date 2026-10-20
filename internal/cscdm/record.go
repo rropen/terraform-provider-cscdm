@@ -26,6 +26,8 @@ type ZoneEdit struct {
 	NewValue        string `json:"newValue,omitempty"`
 	NewTtl          int64  `json:"newTtl,omitempty"`
 	NewPriority     int64  `json:"newPriority,omitempty"`
+	ChangeId        string `json:"changeId,omitempty"`
+	Comments        string `json:"comments,omitempty"`
 }
 
 func (ze *ZoneEdit) KeyId() string {
@@ -63,7 +65,8 @@ type ZoneEditErr struct {
 
 type ZoneEditStatus struct {
 	Content struct {
-		Status string `json:"status"`
+		Status  string `json:"status"`
+		Message string `json:"message"`
 	} `json:"content"`
 }
 
@@ -146,6 +149,8 @@ func (c *Client) editZones() error {
 				NewValue:        recordAction.NewValue,
 				NewTtl:          recordAction.NewTtl,
 				NewPriority:     recordAction.NewPriority,
+				ChangeId:        recordAction.ChangeId,
+				Comments:        recordAction.Comments,
 			},
 		)
 	}
@@ -284,7 +289,7 @@ func (c *Client) editZone(payload ZoneEditReq) (*string, error) {
 				continue
 			}
 
-			return nil, fmt.Errorf("request returned unsuccessful status code: %s", err)
+			return nil, fmt.Errorf("request returned unsuccessful status code: %s: %s: %q", createErrJson.Code, createErrJson.Description, createErrJson.Value)
 		}
 
 		var createJson ZoneEditRes
@@ -319,9 +324,9 @@ func (c *Client) waitForZoneEdits(editId string) error {
 		if editStatusJson.Content.Status == "FAILED" {
 			err = c.cancelZoneEdit(editId)
 			if err != nil {
-				return fmt.Errorf("zone edits returned status FAILED: failed to cancel zone edits: %s", err)
+				return fmt.Errorf("zone edits returned status FAILED (%s): failed to cancel zone edits: %s", editStatusJson.Content.Message, err)
 			}
-			return fmt.Errorf("zone edits returned status FAILED: successfully canceled zone edits")
+			return fmt.Errorf("zone edits returned status FAILED: %s", editStatusJson.Content.Message)
 		}
 
 		time.Sleep(POLL_INTERVAL)
@@ -549,6 +554,23 @@ func (c *Client) GetRecordByTypeByKey(zone *Zone, recordType string, key string)
 	}
 
 	return record, nil
+}
+
+// GetRecordByTypeByKeyValue matches on key and value, since a zone can hold
+// several records of the same type with the same key.
+func (c *Client) GetRecordByTypeByKeyValue(zone *Zone, recordType string, key string, value string) (*ZoneRecord, error) {
+	records := c.GetRecordsByType(zone, recordType)
+	if records == nil {
+		return nil, fmt.Errorf("unsupported record type: %s", recordType)
+	}
+
+	for i, record := range records {
+		if record.Key == key && record.Value == value {
+			return &records[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("record of type %s with key '%s' and value '%s' was not found in zone %s", recordType, key, value, zone.ZoneName)
 }
 
 func (c *Client) GetRecordByTypeById(zone *Zone, recordType string, id string) (*ZoneRecord, error) {

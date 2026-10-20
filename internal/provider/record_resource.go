@@ -42,6 +42,8 @@ type RecordResourceModel struct {
 	Value       types.String `tfsdk:"value"`
 	Ttl         types.Int64  `tfsdk:"ttl"`
 	Priority    types.Int64  `tfsdk:"priority"`
+	ChangeId    types.String `tfsdk:"change_id"`
+	Comments    types.String `tfsdk:"comments"`
 	Status      types.String `tfsdk:"status"`
 	LastUpdated types.String `tfsdk:"last_updated"`
 }
@@ -83,6 +85,12 @@ func (r *RecordResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional: true,
 			},
 			"priority": schema.Int64Attribute{
+				Optional: true,
+			},
+			"change_id": schema.StringAttribute{
+				Optional: true,
+			},
+			"comments": schema.StringAttribute{
 				Optional: true,
 			},
 			"status": schema.StringAttribute{
@@ -147,6 +155,27 @@ func (r *RecordResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	zone, err := r.client.GetZone(plan.Zone.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("error fetching zone", err.Error())
+		return
+	}
+
+	if existing, lookupErr := r.client.GetRecordByTypeByKeyValue(zone, plan.Type.ValueString(), plan.Key.ValueString(), plan.Value.ValueString()); lookupErr == nil {
+		resp.Diagnostics.AddError(
+			"record already exists",
+			fmt.Sprintf(
+				"a %s record with key %q and value %q already exists in zone %q (id=%s). "+
+					"If this record should be managed by Terraform, import it instead: "+
+					"terraform import <resource address> %s:%s:%s",
+				plan.Type.ValueString(), plan.Key.ValueString(), existing.Value, plan.Zone.ValueString(),
+				existing.Id,
+				plan.Zone.ValueString(), plan.Type.ValueString(), existing.Id,
+			),
+		)
+		return
+	}
+
 	recordAction := cscdm.RecordAction{
 		ZoneEdit: cscdm.ZoneEdit{
 			Action:      "ADD",
@@ -155,6 +184,8 @@ func (r *RecordResource) Create(ctx context.Context, req resource.CreateRequest,
 			NewValue:    plan.Value.ValueString(),
 			NewTtl:      plan.Ttl.ValueInt64(),
 			NewPriority: plan.Priority.ValueInt64(),
+			ChangeId:    plan.ChangeId.ValueString(),
+			Comments:    plan.Comments.ValueString(),
 		},
 		ZoneName: plan.Zone.ValueString(),
 	}
@@ -230,6 +261,8 @@ func (r *RecordResource) Update(ctx context.Context, req resource.UpdateRequest,
 			NewValue:     plan.Value.ValueString(),
 			NewTtl:       plan.Ttl.ValueInt64(),
 			NewPriority:  plan.Priority.ValueInt64(),
+			ChangeId:     plan.ChangeId.ValueString(),
+			Comments:     plan.Comments.ValueString(),
 		},
 		ZoneName: plan.Zone.ValueString(),
 	}
@@ -264,6 +297,8 @@ func (r *RecordResource) Delete(ctx context.Context, req resource.DeleteRequest,
 			RecordType:   state.Type.ValueString(),
 			CurrentKey:   state.Key.ValueString(),
 			CurrentValue: state.Value.ValueString(),
+			ChangeId:     state.ChangeId.ValueString(),
+			Comments:     state.Comments.ValueString(),
 		},
 		ZoneName: state.Zone.ValueString(),
 	}

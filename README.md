@@ -40,6 +40,10 @@ resource "cscdm_record" "www_example_com" {
   key   = "www"
   value = "127.0.0.1"
   ttl   = 300
+
+  # optional: sent to CSC as "changeId" and "comments" on the zone edit
+  change_id = "example change ID"
+  comments  = "some example comments"
 }
 ```
 
@@ -54,16 +58,26 @@ provider "cscdm" {
 }
 ```
 
+# Terraform imports
+Import a record resource. You can get the record id from the error message when you try to create a record that already exists.
+```bash
+terraform import 'cscdm_record.example["test.domain.com"]' 'domain.com:CNAME:csc_record_id'
+```
+
 ## Development Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
 - [Go](https://golang.org/doc/install) >= 1.23
+- golangci-lint (OSX: brew install golangci-lint)
 
 ## Building The Provider
 
 1. Clone the repository
 1. Enter the repository directory
 1. Build the provider using the Go `install` command:
+
+Note: commits must be signed.
+https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits
 
 ```shell
 go install
@@ -89,6 +103,10 @@ If you wish to work on the provider, you'll first need [Go](http://www.golang.or
 
 To compile the provider, run `go install`. This will build the provider and put the provider binary in the `$GOPATH/bin` directory.
 
+When you are ready to raise a pull request..
+
+Resolve any linting issues `make lint`
+
 To generate or update documentation, run `make generate`.
 
 In order to run the full suite of Acceptance tests, run `make testacc`.
@@ -98,3 +116,30 @@ In order to run the full suite of Acceptance tests, run `make testacc`.
 ```shell
 make testacc
 ```
+
+### GOPATH
+You may want to adjust your `GOPATH` when building to keep the binary local.
+
+By default, the GOPATH is `$HOME/go`. You can export this to a more local folder if you don't want it dumped in your home folder.
+
+```bash
+$ export GOPATH=/path/to/project/
+```
+
+### Configure `dev_overrides` for local provider installation
+
+You can configure the default location for the provider binary for Terraform so that any projects using it will load your local development version when running `terraform init`, instead of pulling the provider from the Terraform registry.
+See the docs [here](https://developer.hashicorp.com/terraform/cli/config/config-file#development-overrides-for-provider-developers).
+
+~/.terraformrc
+```hcl
+provider_installation {
+  dev_overrides {
+    "rropen/cscdm" = "/path/to/terraform-provider-cscdm/bin"
+  }
+
+  # For all other providers, install as normal.
+  direct {}
+}
+```
+
